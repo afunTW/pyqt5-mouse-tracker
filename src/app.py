@@ -23,9 +23,11 @@ class KalmanFilterTracker(QWidget):
         # drawing setting
         self._drawing = False
         self._image = image
-        self._w, self._h = (1280, 720)
-        self._pen_measurement = QPen(Qt.black, 3)
-        self._pen_measurement_line = QPen(Qt.black, 1)
+        self._w, self._h, self._c = (1280, 720, 3)
+        self._pen_measurement = QPen(Qt.red, 3)
+        self._pen_measurement_line = QPen(Qt.red, 1)
+        self._current_pts = None
+        self._last_pts = None
         
         # init
         self.init_ui()
@@ -36,6 +38,9 @@ class KalmanFilterTracker(QWidget):
     
     def _qimage_to_qpixmap(self, qimg):
         return QPixmap.fromImage(qimg)
+
+    def _reset_qpixmap(self):
+        self._pixmap = self._qimage_to_qpixmap(self._image)
     
     def init_ui(self):
         # set windows
@@ -57,17 +62,26 @@ class KalmanFilterTracker(QWidget):
 
         # set widget
         if self._image:
-            self._w, self.h = self._image.shape
+            self._w, self.h = self._image.shape[:2]
         else:
-            self._image = np.zeros((self._w, self._h), dtype='float32')
+            self._image = np.zeros((self._w, self._h, self._c), dtype='float32')
         self._image = self._ndarray_to_qimage(self._image)
         self._pixmap = self._qimage_to_qpixmap(self._image)
     
     def paintEvent(self, e):
-        # painter setting
-        painter = QPainter(self)
-        # painter.setRenderHint(QPainter.Antialiasing)
-        # painter.drawPixmap(self.rect(), self._pixmap)
+        if self._current_pts:
+            painter = QPainter(self)
+            painter.begin(self)
+            painter.setRenderHint(QPainter.Antialiasing)
+            painter.drawPixmap(self.rect(), self._pixmap)
+
+            self.logger.info(f"draw {self._current_pts}")
+            painter.setPen(self._pen_measurement)
+            painter.drawPoint(self._current_pts)
+            if self._last_pts:
+                painter.setPen(self._pen_measurement_line)
+                painter.drawLine(self._last_pts, self._current_pts)
+            painter.end()
     
     def mousePressEvent(self, e):
         if e.button() == Qt.LeftButton:
@@ -76,14 +90,9 @@ class KalmanFilterTracker(QWidget):
     
     def mouseMoveEvent(self, e):
         if e.buttons() and Qt.LeftButton and self._drawing:
-            self.logger.info(f"draw {e.pos()}")
-            painter = QPainter(self)
-            # painter.setPen(self._pen_measurement)
-            # painter.drawPoint(e.pos())
-            painter.setPen(self._pen_measurement_line)
-            painter.drawLine(self._last_pts, e.pos())
-            self._last_pts = e.pos()
+            self._current_pts = e.pos()
             self.update()
+            self._last_pts = e.pos()
 
     def mouseReleaseEvent(self, e):
         if e.button() == Qt.LeftButton:
