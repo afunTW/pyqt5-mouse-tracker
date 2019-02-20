@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QGridLayout
 from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtWidgets import QLabel
-from PyQt5.QtGui import QPainter, QPixmap, QImage, QPen, QPalette
+from PyQt5.QtGui import QPainter, QPixmap, QImage, QPen, QPalette, QPolygon
 
 class KalmanFilterTracker(QWidget):
     def __init__(self, title='', image=''):
@@ -24,10 +24,9 @@ class KalmanFilterTracker(QWidget):
         self._drawing = False
         self._image = image
         self._w, self._h, self._c = (1280, 720, 3)
-        self._pen_measurement = QPen(Qt.red, 3)
-        self._pen_measurement_line = QPen(Qt.red, 1)
-        self._current_pts = None
-        self._last_pts = None
+        self._pen_measurement = QPen(Qt.black, 4, cap=Qt.RoundCap)
+        self._pen_measurement_line = QPen(Qt.black, 1)
+        self._points = QPolygon()
         
         # init
         self.init_ui()
@@ -49,10 +48,6 @@ class KalmanFilterTracker(QWidget):
         frame_geo = self.frameGeometry()
         frame_geo.moveCenter(self.screen.center())
         self.move(frame_geo.topLeft())
-        palette = self.palette()
-        palette.setColor(self.backgroundRole(), Qt.white)
-        self.setPalette(palette)
-
 
         # set layout
         self.root = QGridLayout()
@@ -69,30 +64,25 @@ class KalmanFilterTracker(QWidget):
         self._pixmap = self._qimage_to_qpixmap(self._image)
     
     def paintEvent(self, e):
-        if self._current_pts:
+        if self._points:
             painter = QPainter(self)
-            painter.begin(self)
             painter.setRenderHint(QPainter.Antialiasing)
-            painter.drawPixmap(self.rect(), self._pixmap)
-
-            self.logger.info(f"draw {self._current_pts}")
-            painter.setPen(self._pen_measurement)
-            painter.drawPoint(self._current_pts)
-            if self._last_pts:
-                painter.setPen(self._pen_measurement_line)
-                painter.drawLine(self._last_pts, self._current_pts)
-            painter.end()
+            for i in range(self._points.count()):
+                painter.setPen(self._pen_measurement)
+                painter.drawPoint(self._points.point(i))
+                if i:
+                    painter.setPen(self._pen_measurement_line)
+                    painter.drawLine(self._points.point(i-1), self._points.point(i))
     
     def mousePressEvent(self, e):
         if e.button() == Qt.LeftButton:
             self._drawing = True
-            self._last_pts = e.pos()
+            self._points = QPolygon()
     
     def mouseMoveEvent(self, e):
         if e.buttons() and Qt.LeftButton and self._drawing:
-            self._current_pts = e.pos()
+            self._points << e.pos()
             self.update()
-            self._last_pts = e.pos()
 
     def mouseReleaseEvent(self, e):
         if e.button() == Qt.LeftButton:
