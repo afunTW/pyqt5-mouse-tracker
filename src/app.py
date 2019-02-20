@@ -13,7 +13,6 @@ from PyQt5.QtWidgets import QLabel
 from PyQt5.QtGui import QPainter, QPixmap, QImage, QPen, QPalette, QPolygon
 
 from filterpy.kalman import KalmanFilter
-from filterpy.common import Q_discrete_white_noise
 
 class KalmanFilterTracker(QWidget):
     def __init__(self, title='', image=''):
@@ -27,15 +26,15 @@ class KalmanFilterTracker(QWidget):
         self._drawing = False
         self._image = image
         self._w, self._h, self._c = (1280, 720, 3)
-        self._pen_mouse = QPen(Qt.black, 4, cap=Qt.RoundCap, style=Qt.DotLine)
-        self._pen_mouse_line = QPen(Qt.black, 1)
-        self._pen_measure = QPen(Qt.red, 4, cap=Qt.RoundCap, style=Qt.SolidLine)
-        self._pen_measure_line = QPen(Qt.red, 1)
-        self._pen_predict = QPen(Qt.blue, 4, cap=Qt.RoundCap, style=Qt.DotLine)
-        self._pen_predict_line = QPen(Qt.blue, 1)
-        self._mouse_points = QPolygon()
+        self._pen_measure = QPen(Qt.black, 3, cap=Qt.RoundCap)
+        self._pen_measure_line = QPen(Qt.black, 1, style=Qt.SolidLine)
+        self._pen_predict = QPen(Qt.blue, 3, cap=Qt.RoundCap)
+        self._pen_predict_line = QPen(Qt.blue, 1, style=Qt.SolidLine)
+        self._pen_correct = QPen(Qt.red, 5, cap=Qt.RoundCap)
+        self._pen_correct_line = QPen(Qt.red, 1, style=Qt.SolidLine)
         self._measure_points = QPolygon()
         self._predict_points = QPolygon()
+        self._correct_points = QPolygon()
         
         # init
         self.init_ui()
@@ -51,8 +50,8 @@ class KalmanFilterTracker(QWidget):
         self._pixmap = self._qimage_to_qpixmap(self._image)
     
     def _reset_polygon(self):
-        self._mouse_points = QPolygon()
         self._measure_points = QPolygon()
+        self._correct_points = QPolygon()
         self._predict_points = QPolygon()
 
     def init_ui(self):
@@ -90,24 +89,29 @@ class KalmanFilterTracker(QWidget):
                               [0., 1., 0., 0.]])
         self.kf.P = np.eye(dim_x) * 1000.           # covariance matrix (dim_x, dim_x)
         self.kf.R = np.eye(dim_z) * 10.             # measurement noise covariance (dim_z, dim_z)
-        self.kf.Q = Q_discrete_white_noise(         # process uncertainty  (dim_x, dim_x)
-            dim=dim_x, dt=.1, var=.1)
+        self.kf.Q = np.eye(dim_x) * 1e-3            # process uncertainty  (dim_x, dim_x)
 
     def paintEvent(self, e):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         
-        assert self._mouse_points.count() == self._predict_points.count()
-        for i in range(self._mouse_points.count()):
+        assert self._measure_points.count() == \
+               self._predict_points.count() == \
+               self._correct_points.count()
+        for i in range(self._measure_points.count()):
             painter.setPen(self._pen_measure)
-            painter.drawPoint(self._mouse_points.point(i))
+            painter.drawPoint(self._measure_points.point(i))
             painter.setPen(self._pen_predict)
             painter.drawPoint(self._predict_points.point(i))
+            painter.setPen(self._pen_correct)
+            painter.drawPoint(self._correct_points.point(i))
             if i:
                 painter.setPen(self._pen_measure_line)
-                painter.drawLine(self._mouse_points.point(i-1), self._mouse_points.point(i))
+                painter.drawLine(self._measure_points.point(i-1), self._measure_points.point(i))
                 painter.setPen(self._pen_predict_line)
                 painter.drawLine(self._predict_points.point(i-1), self._predict_points.point(i))
+                painter.setPen(self._pen_correct_line)
+                painter.drawLine(self._correct_points.point(i-1), self._correct_points.point(i))
     
     def mousePressEvent(self, e):
         if e.button() == Qt.LeftButton:
@@ -122,17 +126,24 @@ class KalmanFilterTracker(QWidget):
             self.logger.debug(f"Record {e.pos()}")
 
             # measurement
-            self._mouse_points << e.pos()
+            self._measure_points << e.pos()
 
             # predict
             self.kf.predict()
-            predict_x, predict_y = self.kf.x[:2]
+            predict_pts = self.kf.x[:2]
+            predict_x, predict_y = predict_pts
             predict_x, predict_y = int(predict_x), int(predict_y)
             self._predict_points << QPoint(predict_x, predict_y)
-            self.logger.info(f"KF.x = {self.kf.x[:2]}; mouse = {e.x()}, {e.y()}")
+
+            # correct
             self.kf.update(np.array([e.x(), e.y()], dtype='float32').reshape((2, 1)))
+            correct_pts = self.kf.x[:2]
+            correct_x, correct_y = correct_pts
+            correct_x, correct_y = int(correct_x), int(correct_y)
+            self._correct_points << QPoint(correct_x, correct_y)
 
             # draw
+            self.logger.info(f"mouse ({e.x()}, {e.y()}); KF predict {predict_pts}; KF correct {correct_pts}")
             self.update()
 
     def mouseReleaseEvent(self, e):

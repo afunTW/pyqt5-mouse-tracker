@@ -1,10 +1,13 @@
 import argparse
 import logging
+import sys
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
+from PyQt5.QtWidgets import QApplication
 
+from src.app import KalmanFilterTracker
 from src.utils import log_handler
 
 
@@ -26,6 +29,12 @@ def main(args: argparse.Namespace):
     logger = logging.getLogger(__name__)
     log_handler(logger, logname=log_path if args.islog else None)
     logger.info(args)
+
+    # run pyqt5
+    app = QApplication(sys.argv)
+    tracker = KalmanFilterTracker()
+    log_handler(tracker.logger)
+    app.exec()
 
 if __name__ == "__main__":
     main(argparser().parse_args())
