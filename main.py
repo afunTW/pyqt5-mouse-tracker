@@ -4,7 +4,6 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-from filterpy.kalman import KalmanFilter
 
 from src.utils import log_handler
 
