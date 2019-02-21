@@ -35,6 +35,9 @@ class KalmanFilterTracker(QWidget):
         self._measure_points = QPolygon()
         self._predict_points = QPolygon()
         self._correct_points = QPolygon()
+        self._measure_text = f"Mouse measurement - ()"
+        self._predict_text = f"Kalman Filter predict - ()"
+        self._correct_text = f"Kalman Filter correct - ()"
         
         # init
         self.init_ui()
@@ -68,7 +71,7 @@ class KalmanFilterTracker(QWidget):
         self.setLayout(self.root)
         self.show()
 
-        # set widget
+        # set image
         if self._image:
             self._w, self.h = self._image.shape[:2]
         else:
@@ -91,6 +94,9 @@ class KalmanFilterTracker(QWidget):
         self.kf.R = np.eye(dim_z) * 10.             # measurement noise covariance (dim_z, dim_z)
         self.kf.Q = np.eye(dim_x) * 1e-3            # process uncertainty  (dim_x, dim_x)
 
+        self._predict_text = f"Kalman Filter predict - ()"
+        self._correct_text = f"Kalman Filter correct - ()"
+
     def paintEvent(self, e):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
@@ -112,6 +118,13 @@ class KalmanFilterTracker(QWidget):
                 painter.drawLine(self._predict_points.point(i-1), self._predict_points.point(i))
                 painter.setPen(self._pen_correct_line)
                 painter.drawLine(self._correct_points.point(i-1), self._correct_points.point(i))
+            
+            painter.setPen(self._pen_measure_line)
+            painter.drawText(50, 60, self._measure_text)
+            painter.setPen(self._pen_predict_line)
+            painter.drawText(50, 80, self._predict_text)
+            painter.setPen(self._pen_correct_line)
+            painter.drawText(50, 100, self._correct_text)
     
     def mousePressEvent(self, e):
         if e.button() == Qt.LeftButton:
@@ -120,6 +133,7 @@ class KalmanFilterTracker(QWidget):
             x, y = float(e.x()), float(e.y())
             self._reset_polygon()
             self.init_kalman_filter(x, y)
+            self._measure_text = f"Mouse measurement - ({e.x()}, {e.y()})"
     
     def mouseMoveEvent(self, e):
         if e.buttons() and Qt.LeftButton and self._drawing:
@@ -127,6 +141,7 @@ class KalmanFilterTracker(QWidget):
 
             # measurement
             self._measure_points << e.pos()
+            self._measure_text = f"Mouse measurement - ({e.x()}, {e.y()})"
 
             # predict
             self.kf.predict()
@@ -134,6 +149,7 @@ class KalmanFilterTracker(QWidget):
             predict_x, predict_y = predict_pts
             predict_x, predict_y = int(predict_x), int(predict_y)
             self._predict_points << QPoint(predict_x, predict_y)
+            self._predict_text = f"Kalman Filter predict - ({predict_pts[0]:.4f}, {predict_pts[1]:4f})"
 
             # correct
             self.kf.update(np.array([e.x(), e.y()], dtype='float32').reshape((2, 1)))
@@ -141,6 +157,7 @@ class KalmanFilterTracker(QWidget):
             correct_x, correct_y = correct_pts
             correct_x, correct_y = int(correct_x), int(correct_y)
             self._correct_points << QPoint(correct_x, correct_y)
+            self._correct_text = f"Kalman Filter correct - ({correct_pts[0]:4f}, {correct_pts[1]:4f})"
 
             # draw
             self.logger.info(f"mouse ({e.x()}, {e.y()}); KF predict {predict_pts}; KF correct {correct_pts}")
