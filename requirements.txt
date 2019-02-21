@@ -1,0 +1,18 @@
+-i https://pypi.org/simple
+cycler==0.10.0
+filterpy==1.4.5
+kiwisolver==1.0.1
+llvmlite==0.27.1
+matplotlib==3.0.2
+numba==0.42.1
+numpy==1.16.1
+opencv-python==4.0.0.21
+pandas==0.24.1
+pyparsing==2.3.1
+pyqt5-sip==4.19.14
+pyqt5==5.12
+python-dateutil==2.8.0
+pytz==2018.9
+scikit-learn==0.20.2
+scipy==1.2.1
+six==1.12.0
